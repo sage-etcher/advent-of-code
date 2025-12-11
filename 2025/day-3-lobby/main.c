@@ -50,6 +50,26 @@ main (void) -> int:
 #endif
 
 
+static uint64_t
+atou64 (const char *str)
+{
+    const uint64_t BASE = 10;
+    uint64_t num = 0;
+    const char *iter = NULL;
+
+    for (iter = str; *iter; iter++)
+    {
+        if (!isdigit (*iter))
+        {
+            return num;
+        }
+        num *= BASE;
+        num += *iter - '0';
+    }
+
+    return num;
+}
+
 
 static long
 get_max (FILE *fp, long start_position, long end_position, char *p_ret_max)
@@ -75,15 +95,15 @@ get_max (FILE *fp, long start_position, long end_position, char *p_ret_max)
     return max_position;
 }
 
-static int
+static int64_t
 decode_line (FILE *fp)
 {
-    enum { MAX_DIGITS = 2 };
+    enum { MAX_DIGITS = 12 };
     char digits[MAX_DIGITS+1] = "";
     long start_position = 0;
     long end_position = 0;
     long prev_position = 0;
-    int value = 0;
+    int64_t value = 0;
     long i = 0;
     char c = 0;
 
@@ -91,7 +111,11 @@ decode_line (FILE *fp)
     while (((c = fgetc (fp)) != EOF) && (c != '\n')) {}
     end_position = ftell (fp);
 
-    if (start_position == end_position) return -1;
+    if (start_position == end_position) 
+    {
+        //printf ("exit condition: %c %ld %ld\n", c, start_position, end_position);
+        return -1;
+    }
 
     prev_position = start_position;
     for (i = 0; i < MAX_DIGITS; i++)
@@ -103,8 +127,10 @@ decode_line (FILE *fp)
     (void)fgetc (fp);
 
     digits[MAX_DIGITS] = '\0';
+    //printf ("digits: %s\n", digits);
 
-    value = atoi (digits);
+    value = atou64 (digits);
+    //printf ("value: %ld\n", value);
 
     return value;
 }
@@ -114,8 +140,8 @@ main (void)
 {
     const char *INPUT_FILE = "input";
     FILE *fp = NULL;
-    int value = 0;
-    int sum = 0;
+    int64_t value = 0;
+    int64_t sum = 0;
 
     fp = fopen (INPUT_FILE, "r");
     assert (fp != NULL);
@@ -124,11 +150,10 @@ main (void)
         value = decode_line (fp);
         if (value < 0) break;
 
-        //printf ("value: %d\n", value);
         sum += value;
     } while (!feof (fp));
 
-    printf ("sum: %d\n", sum);
+    printf ("sum: %ld\n", sum);
 
     return 0;
 }
