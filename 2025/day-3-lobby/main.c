@@ -63,6 +63,7 @@ get_max (FILE *fp, long start_position, long end_position, char *p_ret_max)
     for (i = start_position; i < end_position; i++)
     {
         c = getc (fp);
+        //printf ("c %ld: %c\n", i, c);
         if (c > max_char)
         {
             max_char = c;
@@ -90,11 +91,16 @@ decode_line (FILE *fp)
     while (((c = fgetc (fp)) != EOF) && (c != '\n')) {}
     end_position = ftell (fp);
 
+    if (start_position == end_position) return -1;
+
     prev_position = start_position;
     for (i = 0; i < MAX_DIGITS; i++)
     {
-        prev_position = get_max (fp, prev_position, end_position-i, &digits[i]);
+        prev_position = get_max (fp, prev_position, end_position-MAX_DIGITS+i, &digits[i]) + 1;
+        //printf ("digits[%ld]: %c\n", i, digits[i]);
     }
+
+    (void)fgetc (fp);
 
     digits[MAX_DIGITS] = '\0';
 
@@ -106,7 +112,7 @@ decode_line (FILE *fp)
 int
 main (void)
 {
-    const char *INPUT_FILE = "test_input";
+    const char *INPUT_FILE = "input";
     FILE *fp = NULL;
     int value = 0;
     int sum = 0;
@@ -116,6 +122,9 @@ main (void)
 
     do {
         value = decode_line (fp);
+        if (value < 0) break;
+
+        //printf ("value: %d\n", value);
         sum += value;
     } while (!feof (fp));
 
