@@ -43,8 +43,8 @@ is_repeating (uint64_t x)
     char cmp[U64_STRING_MAX/2+1];
     uint_fast8_t cmp_cnt = 0;
 
-    //int match = 0;
-    //uint_fast8_t i = 0;
+    int match = 0;
+    uint_fast8_t i = 0;
 
     buf_cnt = u64toa (buf, x);
 
@@ -53,16 +53,19 @@ is_repeating (uint64_t x)
     cmp[cmp_cnt] = '\0';
 
 
+#if 0
+    /* part 1 */
     /* replace lower commented  */
     if (cmp_cnt == 0) return 0;
     if (buf_cnt % 2) return 0;
     return strncmp (buf+cmp_cnt, cmp, cmp_cnt) == 0;
+#endif
 
 
     /* i miss read and thought we was looking for any repeating, not 
      * just repeating twise owo
      * maybe this will be usefull for part 2? idk */
-#if 0
+    /* yoooooo i predicted correct lets goo i can reuse this hehehehehe */
     for (; cmp_cnt >= 1; cmp[--cmp_cnt] = '\0')
     {
         if (buf_cnt % cmp_cnt) continue;
@@ -73,20 +76,19 @@ is_repeating (uint64_t x)
             if (strncmp (buf+i, cmp, cmp_cnt) != 0)
             {
                 match = 0;
-                fprintf (stderr, "failed: %s: %s\n", buf, cmp);
+                //printf ("fail: %s: %s\n", buf, cmp);
                 break;
             }
         }
 
         if (match)
         {
-            printf ("match %s: %s\n", buf, cmp);
+            //printf ("pass: %s: %s\n", buf, cmp);
             break;
         }
     }
  
     return match;
-#endif
 }
 
 
@@ -117,12 +119,7 @@ main (void)
         {
             if (is_repeating (i))
             {
-                printf ("pass: %lu\n", i);
                 sum += i;
-            }
-            else
-            {
-                printf ("fail: %lu\n", i);
             }
         }
     } while (!feof (fp));
