@@ -5,12 +5,13 @@
 #include <string.h>
 
 #define U32_STRING_MAX 10
+#define U64_STRING_MAX 20
 
 static uint_fast8_t
-u32toa (char *buf, uint32_t x)
+u64toa (char *buf, uint64_t x)
 {
-    const uint32_t BASE = 10;
-    uint32_t ii = x;
+    const uint64_t BASE = 10;
+    uint64_t ii = x;
     uint_fast8_t jj = 0;
     uint_fast8_t cnt = 1;
     char c = '\0';
@@ -19,7 +20,7 @@ u32toa (char *buf, uint32_t x)
     assert (buf != NULL);
 
     for (; ii >= BASE; cnt++, ii /= BASE) {}
-    assert (U32_STRING_MAX >= cnt);
+    assert (U64_STRING_MAX >= cnt);
 
     for (ii = x, jj = 0; jj <= cnt; jj++, ii /= BASE)
     {
@@ -34,23 +35,34 @@ u32toa (char *buf, uint32_t x)
 
 
 static int
-is_repeating (uint32_t x)
+is_repeating (uint64_t x)
 {
-    char buf[U32_STRING_MAX+1];
+    char buf[U64_STRING_MAX+1];
     uint_fast8_t buf_cnt = 0;
 
-    char cmp[U32_STRING_MAX/2+1];
+    char cmp[U64_STRING_MAX/2+1];
     uint_fast8_t cmp_cnt = 0;
 
-    int match = 0;
-    uint_fast8_t i = 0;
+    //int match = 0;
+    //uint_fast8_t i = 0;
 
-    buf_cnt = u32toa (buf, x);
+    buf_cnt = u64toa (buf, x);
 
     cmp_cnt = buf_cnt / 2;
     memcpy (cmp, buf, cmp_cnt);
     cmp[cmp_cnt] = '\0';
 
+
+    /* replace lower commented  */
+    if (cmp_cnt == 0) return 0;
+    if (buf_cnt % 2) return 0;
+    return strncmp (buf+cmp_cnt, cmp, cmp_cnt) == 0;
+
+
+    /* i miss read and thought we was looking for any repeating, not 
+     * just repeating twise owo
+     * maybe this will be usefull for part 2? idk */
+#if 0
     for (; cmp_cnt >= 1; cmp[--cmp_cnt] = '\0')
     {
         if (buf_cnt % cmp_cnt) continue;
@@ -61,6 +73,7 @@ is_repeating (uint32_t x)
             if (strncmp (buf+i, cmp, cmp_cnt) != 0)
             {
                 match = 0;
+                fprintf (stderr, "failed: %s: %s\n", buf, cmp);
                 break;
             }
         }
@@ -73,6 +86,7 @@ is_repeating (uint32_t x)
     }
  
     return match;
+#endif
 }
 
 
@@ -81,12 +95,12 @@ main (void)
 {
     int rc = 0;
     FILE *fp = NULL;
-    uint32_t range_lo = 0;
-    uint32_t range_hi = 0;
+    uint64_t range_lo = 0;
+    uint64_t range_hi = 0;
 
-    uint32_t i = 0;
+    uint64_t i = 0;
 
-    uint32_t sum = 0;
+    uint64_t sum = 0;
 
     fp = fopen ("input", "r");
     if (fp == NULL)
@@ -96,19 +110,24 @@ main (void)
     }
 
     do {
-        rc = fscanf (fp, "%d-%d,", &range_lo, &range_hi);
+        rc = fscanf (fp, "%lu-%lu,", &range_lo, &range_hi);
         if (rc == EOF) break;
 
         for (i = range_lo; i <= range_hi; i++)
         {
             if (is_repeating (i))
             {
+                printf ("pass: %lu\n", i);
                 sum += i;
+            }
+            else
+            {
+                printf ("fail: %lu\n", i);
             }
         }
     } while (!feof (fp));
 
-    printf ("sum: %u\n", sum);
+    printf ("sum: %lu\n", sum);
 
     fclose (fp);
     return 0;
