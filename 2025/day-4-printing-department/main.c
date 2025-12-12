@@ -6,28 +6,84 @@
 #include <stdlib.h>
 #include <string.h>
 
-static long
-get_pos (long x, long y, long line_length)
+struct warehouse {
+    char *m;
+    size_t size;
+    char **plot;
+    size_t width;
+    size_t height;
+};
+
+static char *
+fdump (const char *filename)
 {
-    return y * (line_length+1) + x;
+    FILE *fp = NULL;
+    char *contents = NULL;
+    long size = 0;
+
+    fp = fopen (filename, "r");
+    assert (fp != NULL);
+
+    fseek (fp, 0L, SEEK_END);
+    size = ftell (fp);
+    assert (size > 0);
+
+    contents = malloc (size+1);
+    assert (contents != NULL);
+
+    fseek (fp, 0L, SEEK_SET);
+    fread (contents, sizeof (char), size, fp);
+
+    contents[size] = '\0';
+    return contents;
+}
+
+static char **
+strcsplit (char *str, char split_c, size_t *p_ret_n)
+{
+    char **arr = NULL;
+    char *iter = NULL;
+    size_t i = 0;
+    size_t n = 1;
+
+    assert (str != NULL);
+    assert (p_ret_n != NULL);
+
+    /* get length */
+    for (iter = str; (iter = strchr (iter, split_c)) != NULL; n++, iter++) {}
+
+    /* allocate room for return array */
+    assert (n != 0);
+    arr = malloc (sizeof (char *) * n);
+    assert (arr != NULL);
+
+    /* fill the return array */
+    iter = str;
+    i = 0;
+    do {
+        if (iter > str)
+        {
+            *iter++ = '\0';
+        }
+        arr[i++] = iter;
+
+        iter = strchr (iter, split_c);
+    } while (iter != NULL);
+
+    *p_ret_n = n;
+    return arr;
 }
 
 static int
-fgetc_pos (FILE *fp, long pos)
-{
-    fseek (fp, pos, SEEK_SET);
-    return fgetc (fp);
-}
-
-static int
-check_pos (FILE *fp, long x, long y, long line_length, long line_count)
+check_pos (struct warehouse *self, int x, int y)
 {
     char c = 0;
 
-    if ((x < 0) || (x >= line_length)) return 0;
-    if ((y < 0) || (y >= line_count)) return 0;
+    if ((x < 0) || (x >= self->width)) return 0;
+    if ((y < 0) || (y >= self->height)) return 0;
+    if (&self->plot[y][x] >= self->m + self->size) return 0;
 
-    if ('@' == fgetc_pos (fp, get_pos (x, y, line_length)))
+    if ('@' == self->plot[y][x])
     {
         return 1;
     }
@@ -38,20 +94,87 @@ check_pos (FILE *fp, long x, long y, long line_length, long line_count)
 }
 
 static int
-is_accessble (FILE *fp, long x, long y, long line_length, long line_count)
+is_accessable (struct warehouse *self, int x, int y)
 {
     int total = 0;
-    total += check_pos (fp, x-1, y-1, line_length, line_count);
-    total += check_pos (fp, x-1, y,   line_length, line_count);
-    total += check_pos (fp, x-1, y+1, line_length, line_count);
-    total += check_pos (fp, x,   y-1, line_length, line_count);
-    total += check_pos (fp, x,   y+1, line_length, line_count);
-    total += check_pos (fp, x+1, y-1, line_length, line_count);
-    total += check_pos (fp, x+1, y,   line_length, line_count);
-    total += check_pos (fp, x+1, y+1, line_length, line_count);
+    total += check_pos (self, x-1, y-1);
+    total += check_pos (self, x-1, y  );
+    total += check_pos (self, x-1, y+1);
+    total += check_pos (self, x,   y-1);
+    total += check_pos (self, x,   y+1);
+    total += check_pos (self, x+1, y-1);
+    total += check_pos (self, x+1, y  );
+    total += check_pos (self, x+1, y+1);
 
     return total < 4;
 }
+
+int
+remove_movable (struct warehouse *self)
+{
+    int moved = 0;
+    int x = 0;
+    int y = 0;
+
+    for (y = 0; y < self->height; y++)
+    {
+        for (x = 0; x < self->width; x++)
+        {
+            if (&self->plot[y][x] >= self->m + self->size)
+            {
+                continue;
+            }
+
+            if (self->plot[y][x] != '@') 
+            {
+                putchar (self->plot[y][x]);
+                continue;
+            }
+
+            if (is_accessable (self, x, y))
+            {
+                self->plot[y][x] = 'x';
+                moved++;
+            }
+            putchar (self->plot[y][x]);
+        }
+        putchar ('\n');
+    }
+
+    return moved;
+}
+
+int
+main (int argc, char **argv)
+{
+    assert (argc >= 2);
+    assert (argv != NULL);
+    assert (argv[1] != NULL);
+
+    int moved = 0;
+    int sum = 0;
+    const char *const INPUT_FILE = argv[1];
+    struct warehouse floor = { 0 };
+
+    floor.m = fdump (INPUT_FILE);
+    floor.size = strlen (floor.m);
+    floor.plot = strcsplit (floor.m, '\n', &floor.height);
+    floor.width = strlen (floor.plot[0]);
+
+    do {
+        moved = remove_movable (&floor);
+        sum += moved;
+    } while (moved != 0);
+
+    printf ("sum: %d\n", sum);
+
+    free (floor.plot);
+    free (floor.m);
+    return 0;
+}
+
+
+#if 0
 
 int
 main (void)
@@ -118,5 +241,6 @@ main (void)
     fclose (fp);
     return 0;
 }
+#endif
 
 /* end of file */
