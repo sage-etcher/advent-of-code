@@ -1,0 +1,175 @@
+
+#include <assert.h>
+#include <float.h>
+#include <inttypes.h>
+#include <math.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+typedef struct {
+    uint64_t x, y, z, w;
+} vec4i_t;
+
+typedef vec4i_t vec3i_t;
+typedef vec4i_t vec2i_t;
+
+#define MAX_LEAVES 10
+
+typedef struct tree_elem {
+    vec3i_t pos;
+    struct tree_elem *leafs[MAX_LEAVES];
+    size_t leaf_cnt;
+} tree_t;
+
+static float
+euclidean_distance (vec3i_t a, vec3i_t b)
+{
+    uint64_t x = a.x - b.x;
+    uint64_t y = a.y - b.y;
+    uint64_t z = a.z - b.z;
+    return sqrtf (x * x + y * y + z * z);
+}
+
+static int
+in_loop (tree_t *haystack, tree_t *needle)
+{
+    return 0;
+}
+
+static int
+add_leaf (tree_t *self, tree_t *leaf)
+{
+    if (self->leaf_cnt >= MAX_LEAVES)
+    {
+        return 1;
+    }
+
+    self->leafs[self->leaf_cnt++] = leaf;
+    return 0;
+}
+
+static int
+is_leaf (tree_t *self, tree_t *leaf)
+{
+    size_t i = 0;
+
+    for (i = 0; i < self->leaf_cnt; i++)
+    {
+        if (self->leafs[i] == leaf)
+        {
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
+int
+main (int argc, char **argv)
+{
+    char *file_input = NULL;
+    FILE *fp = NULL;
+    int c = 0;
+
+    size_t count = 0;
+    tree_t *boxes = NULL;
+    tree_t *iter = NULL;
+
+    size_t ii = 0;
+    size_t jj = 0;
+    size_t kk = 0;
+
+    float distance = 0.0f;
+    float min_distance = FLT_MAX;
+
+    vec2i_t nearest_pair = { 0 };
+    float max_distances[3] = { 0 };
+
+
+    assert (argc >= 2);
+    assert (argv != NULL);
+    assert (argv[1] != NULL);
+
+    file_input = argv[1];
+    fp = fopen (file_input, "r");
+    assert (fp != NULL);
+
+    /* get # of lines */
+    while ((c = fgetc (fp)) != EOF) if (c == '\n') count++;
+    assert (count != 0);
+
+    boxes = malloc (sizeof (*boxes) * count);
+    assert (boxes != NULL);
+
+    (void)fseek (fp, 0L, SEEK_SET);
+    for (ii = 0; ii < count; ii++)
+    {
+        (void)fscanf (fp, "%"SCNu64",%"SCNu64",%"SCNu64"\n",
+                &boxes[ii].pos.x, &boxes[ii].pos.y, &boxes[ii].pos.z);
+        boxes[ii].leaf_cnt = 0;
+    }
+
+    for (ii = 0; ii < 10; ii++)
+    {
+        nearest_pair = (vec2i_t){ .x = 0, .y = 0 };
+        min_distance = FLT_MAX;
+        for (jj = 0; jj < count; jj++)
+        {
+            for (kk = 0; kk < count; kk++)
+            {
+                if (kk == jj) continue;
+                if (is_leaf (&boxes[jj], &boxes[kk])) continue;
+                if (is_leaf (&boxes[kk], &boxes[jj])) continue;
+
+                distance = euclidean_distance (boxes[kk].pos, boxes[jj].pos);
+
+                if (distance >= min_distance) continue;
+
+                nearest_pair.x = jj;
+                nearest_pair.y = kk;
+                min_distance = distance;
+            }
+        }
+
+        printf ("using nearest %zu %zu\n", nearest_pair.x, nearest_pair.y);
+        assert (nearest_pair.x != nearest_pair.y);
+
+        (void)add_leaf (&boxes[nearest_pair.x], &boxes[nearest_pair.y]);
+    }
+
+    max_distances[0] = 0.0f;
+    max_distances[1] = 0.0f;
+    max_distances[2] = 0.0f;
+    for (ii = 0; ii < count; ii++)
+    {
+        printf ("%2zu: { %3"SCNu64", %3"SCNu64", %3"SCNu64" }: [ ", ii, 
+                    boxes[ii].pos.x, boxes[ii].pos.y, boxes[ii].pos.z);
+
+        for (jj = 0; jj < boxes[ii].leaf_cnt; jj++)
+        {
+            printf ("%2d ", (int)(((uintptr_t)boxes[ii].leafs[jj] - (uintptr_t)boxes)/sizeof (*boxes)));
+            if (jj + 1 < boxes[ii].leaf_cnt)
+            {
+                printf (", ");
+            }
+        }
+        printf ("]\n");
+#if 0
+        if ((boxes[ii].prev == NULL) && (boxes[ii].next != NULL))
+        {
+            printf ("{ %"SCNu64", %"SCNu64", %"SCNu64" } : { %"SCNu64", %"SCNu64", %"SCNu64" } : %lf\n",
+                    boxes[ii].pos.x, boxes[ii].pos.y, boxes[ii].pos.z, 
+                    boxes[ii].next->pos.x, boxes[ii].next->pos.y, boxes[ii].next->pos.z, 
+                    euclidean_distance (boxes[ii].pos, boxes[ii].next->pos));
+        }
+#endif
+    }
+
+
+    fclose (fp);
+    return 0;
+}
+
+/* end of file */
