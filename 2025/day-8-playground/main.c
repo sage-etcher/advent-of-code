@@ -13,7 +13,7 @@
 typedef struct { uint64_t x, y, z; } u64vec3_t;
 typedef struct { uint64_t x, y; } u64vec2_t;
 
-#define MAX_CONNECTIONS 10
+#define MAX_CONNECTIONS 20
 #define MAX_CIRCUTS 1000
 
 typedef struct junction_box {
@@ -36,10 +36,11 @@ typedef struct {
 static double
 euclidean_distance (u64vec3_t a, u64vec3_t b)
 {
-    uint64_t x = a.x - b.x;
-    uint64_t y = a.y - b.y;
-    uint64_t z = a.z - b.z;
-    return sqrt (x * x + y * y + z * z);
+    const uint64_t x = a.x - b.x;
+    const uint64_t y = a.y - b.y;
+    const uint64_t z = a.z - b.z;
+    //return sqrt (x * x + y * y + z * z);
+    return x * x + y * y + z * z;
 }
 
 static junction_box_t *
@@ -80,13 +81,77 @@ get_junction_boxes (char *filename, size_t *p_ret_n)
     return buf;
 }
 
+static int
+native_bsearch_int_cb (const int *p_a, const int *p_b)
+{
+    return *p_a - *p_b;
+}
+
+static int
+bsearch_nearest (int key, int *arr, size_t n)
+{
+    int lo = 0;
+    int hi = n;
+    int mid = 0;
+
+    while (lo <= hi)
+    {
+        mid = (hi + lo) / 2;
+        if (arr[mid] == key) 
+        {
+            return 0;
+        }
+        else if (arr[mid] <  key) 
+        {
+            lo = mid + 1;
+        }
+        else 
+        {
+            hi = mid - 1;
+        }
+    }
+
+    return mid;
+}
+
+static int
+binsert (int key, int *arr, size_t n)
+{
+    int i = 0;
+    int mid = bsearch_nearest (key, arr, n);
+
+    /*
+    printf ("binsert: %2d %2d [ ", key, mid);
+    for (i = 0; i < n; i++)
+    {
+        printf ("%2d ", arr[i]);
+    }
+    printf ("] -> [ ");
+    */
+
+    memmove (arr+mid+1, arr+mid, (n-mid) * sizeof (*arr));
+    arr[mid] = key;
+
+    /*
+    for (i = 0; i < n+1; i++)
+    {
+        printf ("%2d ", arr[i]);
+    }
+    printf ("]\n");
+    */
+
+    return mid;
+}
+
 int
 add_connection (junction_box_t *self, int index)
 {
+    int i = 0;
     assert (self != NULL);
     assert (self->connection_count <= MAX_CONNECTIONS);
 
-    self->connections[self->connection_count++] = index;
+    i = binsert (index, self->connections, self->connection_count);
+    self->connection_count++;
 
     return 0;
 }
@@ -94,70 +159,46 @@ add_connection (junction_box_t *self, int index)
 int
 are_directly_connected (junction_box_t *boxes, size_t n, int a, int b)
 {
-    size_t i = 0;
     junction_box_t *box_a = NULL;
+    int *match = 0;
 
     assert (boxes != NULL);
     assert (a < n);
     assert (b < n);
 
     box_a = &boxes[a];
-    for (; i < box_a->connection_count; i++)
-    {
-        if (box_a->connections[i] == b) return 1;
-    }
+    match = bsearch (&b, box_a->connections, box_a->connection_count,
+            sizeof (*box_a->connections), (__compar_fn_t)native_bsearch_int_cb);
 
-    return 0;
-}
-
-int
-get_nearest (junction_box_t *boxes, size_t n, size_t cmp_index, double *p_dist)
-{
-    size_t i = 0;
-    double distance = 0.0f;
-    double min_distance = DBL_MAX;
-
-    int min_index = -1;
-
-    for (; i < n; i++)
-    {
-        if (i == cmp_index) continue;   /* dont match itself */
-
-        /* dont match 2 points that are already connected */
-        if (are_directly_connected (boxes, n, cmp_index, i)) continue;
-        if (are_directly_connected (boxes, n, i, cmp_index)) continue;
-
-        distance = euclidean_distance (boxes[cmp_index].point, boxes[i].point);
-        if (distance >= min_distance) continue;
-
-        min_distance = distance;
-        min_index = i;
-    }
-
-    if (p_dist != NULL) *p_dist = min_distance;
-
-    return min_index;
+    return (match != NULL);
 }
 
 pair_t
-get_next_nearest (junction_box_t *boxes, size_t n)
+get_next_nearest_fast (junction_box_t *boxes, size_t n)
 {
-    size_t i = 0;
-
-    int nearest_index = -1;
+    size_t ii = 0;
+    size_t jj = 0;
 
     double distance = 0.0f;
     double min_distance = DBL_MAX;
 
-    pair_t nearest_pair = { .x= 0, .y = 0 };
+    pair_t nearest_pair = { .x = 0, .y = 0 };
 
-    for (; i < n; i++)
+    for (; ii < n; ii++)
     {
-        nearest_index = get_nearest (boxes, n, i, &distance);
-        if (distance < min_distance)
+        for (jj = 0; jj < n; jj++)
         {
+            if (ii == jj) continue;   /* dont match itself */
+
+            /* dont match 2 points that are already connected */
+            if (are_directly_connected (boxes, n, ii, jj)) continue;
+            if (are_directly_connected (boxes, n, jj, ii)) continue;
+
+            distance = euclidean_distance (boxes[ii].point, boxes[jj].point);
+            if (distance > min_distance) continue;
+
             min_distance = distance;
-            nearest_pair = (pair_t){ .x = i, .y = nearest_index };
+            nearest_pair = (pair_t){ .x = ii, .y = jj };
         }
     }
 
@@ -197,6 +238,7 @@ int
 main (int argc, char **argv)
 {
     char *input_file = NULL;
+    int max_connections = 0;
 
     size_t i = 0;
     size_t j = 0;
@@ -210,16 +252,23 @@ main (int argc, char **argv)
 
     pair_t nearest_pair = { .x = 0, .y = 0 };
 
-    assert (argc >= 2);
+    assert (argc >= 3);
     assert (argv != NULL);
     assert (argv[1] != NULL);
+    assert (argv[2] != NULL);
     input_file = argv[1];
+    max_connections = atoi (argv[2]);
+    assert (max_connections >= 0);
 
     boxes = get_junction_boxes (input_file, &box_cnt);
-    for (i = 0; i < 1000; i++)
+    for (i = 0; i < max_connections; i++)
     {
-        nearest_pair = get_next_nearest (boxes, box_cnt);
-        assert (nearest_pair.x != nearest_pair.y);
+        nearest_pair = get_next_nearest_fast (boxes, box_cnt);
+        if (nearest_pair.x == nearest_pair.y)
+        {
+            fprintf (stderr, "error: no more boxes can be connected\n");
+            break;
+        }
 
         add_connection (&boxes[nearest_pair.x], nearest_pair.y);
         add_connection (&boxes[nearest_pair.y], nearest_pair.x);
@@ -242,7 +291,12 @@ element_handled:
     for (i = 0; i < circut_cnt; i++)
     {
         circut_length = hmlen (circuts[i].map);
-        printf ("%zu %zu\n", i, circut_length);
+        printf ("%02zu: %3zu: [ ", circut_length, i);
+        for (j = 0; j < circut_length; j++)
+        {
+            printf ("%4d ", circuts[i].map[j].value);
+        }
+        printf ("]\n");
         for (j = 3; j-- > 0;)
         {
             if (top_circuts[j] < circut_length)
