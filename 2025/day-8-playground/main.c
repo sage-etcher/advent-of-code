@@ -1,17 +1,15 @@
 
+#include "ivec.h"
+
 #include <stb_ds.h>
 
 #include <assert.h>
 #include <float.h>
 #include <inttypes.h>
-#include <math.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-typedef struct { uint64_t x, y, z; } u64vec3_t;
-typedef struct { uint64_t x, y; } u64vec2_t;
 
 #define MAX_CONNECTIONS 20
 #define MAX_CIRCUTS 1000
