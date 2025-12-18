@@ -1,5 +1,6 @@
 
 #include <assert.h>
+#include <inttypes.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -7,6 +8,15 @@
 typedef struct {
     uint64_t x, y;
 } ivec2_t;
+
+#define MAX(x,y) (x < y ? y : x)
+#define MIN(x,y) (x > y ? y : x)
+
+int
+cmp_cb_range (const ivec2_t *p_x, const ivec2_t *p_y)
+{
+    return p_x->x - p_y->x;
+}
 
 int
 main (int argc, char **argv)
@@ -19,6 +29,7 @@ main (int argc, char **argv)
     size_t jj = 0;
     ivec2_t *ranges = NULL;
     size_t range_cnt = 0;
+    int64_t diff = 0;
 
     int sum = 0;
 
@@ -29,7 +40,7 @@ main (int argc, char **argv)
     assert (fp != NULL);
 
     do {
-        rc = fscanf (fp, "%llu-%llu\n", &oh.x, &oh.y);
+        rc = fscanf (fp, "%"SCNu64"-%"SCNu64"\n", &oh.x, &oh.y);
         range_cnt++;
     } while (rc == 2);
     range_cnt--;
@@ -42,34 +53,24 @@ main (int argc, char **argv)
     fseek (fp, 0L, SEEK_SET);
     for (ii = 0; ii < range_cnt; ii++)
     {
-        rc = fscanf (fp, "%llu-%llu\n", &ranges[ii].x, &ranges[ii].y);
+        rc = fscanf (fp, "%"SCNu64"-%"SCNu64"\n", &ranges[ii].x, &ranges[ii].y);
     }
 
     fclose (fp);
     fp = NULL;
 
+    (void)qsort (ranges, range_cnt, sizeof (*ranges), (__compar_fn_t)cmp_cb_range);
+
     for (ii = 0; ii < range_cnt; ii++)
     {
-        ivec2_t *r0 = &ranges[ii];
-        for (jj = 0; jj < range_cnt; jj++)
+        for (jj = ii + 1; jj < range_cnt; jj++)
         {
-            if (ii == jj) continue;
-
-            ivec2_t *r1 = &ranges[jj];
-            ivec2_t c = { 0 };
-
-            if ((r1->x <= r0->x) && (r0->x <= r1->y))
-            {
-            }
-
-            // 2-130
-            // 14-18
-            // if x1 < x2 && y1 > y2: remove 2
-            // if 
-
+            diff = overlap_diff (ranges[ii], ranges[jj]);
+            if (diff <= 0) break;
 
         }
     }
+
 
     printf ("sum: %d\n", sum);
 
