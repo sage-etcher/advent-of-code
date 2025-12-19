@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 typedef struct {
     uint64_t x, y;
@@ -11,6 +12,12 @@ typedef struct {
 
 #define MAX(x,y) (x < y ? y : x)
 #define MIN(x,y) (x > y ? y : x)
+
+static inline int
+are_overlaping (ivec2_t a, ivec2_t b)
+{
+    return a.x <= b.y && b.x <= a.y;
+}
 
 int
 cmp_cb_range (const ivec2_t *p_x, const ivec2_t *p_y)
@@ -30,6 +37,8 @@ main (int argc, char **argv)
     ivec2_t *ranges = NULL;
     size_t range_cnt = 0;
     int64_t diff = 0;
+    uint64_t max = 0;
+    uint64_t min = 0;
 
     int sum = 0;
 
@@ -54,26 +63,47 @@ main (int argc, char **argv)
     for (ii = 0; ii < range_cnt; ii++)
     {
         rc = fscanf (fp, "%"SCNu64"-%"SCNu64"\n", &ranges[ii].x, &ranges[ii].y);
+        assert (ranges[ii].x <= ranges[ii].y);
     }
 
     fclose (fp);
     fp = NULL;
 
-    (void)qsort (ranges, range_cnt, sizeof (*ranges), (__compar_fn_t)cmp_cb_range);
-
+    /* for every entry */
     for (ii = 0; ii < range_cnt; ii++)
     {
-        for (jj = ii + 1; jj < range_cnt; jj++)
+        for (jj = 0; jj < range_cnt; jj++)
         {
-            diff = overlap_diff (ranges[ii], ranges[jj]);
-            if (diff <= 0) break;
+            if (ii == jj) continue;
+            if (!are_overlaping (ranges[ii], ranges[jj])) continue;
 
+            printf ("clean: %"SCNu64"-%"SCNu64": %"SCNu64"-%"SCNu64"\n", 
+                    ranges[ii].x, ranges[ii].y,
+                    ranges[jj].x, ranges[jj].y);
+
+            ranges[ii].x = MIN (ranges[ii].x, ranges[jj].x);
+            ranges[ii].y = MAX (ranges[ii].y, ranges[jj].y);
+
+            if (range_cnt - jj  > 0)
+            {
+                memmove (ranges+jj, ranges+jj+1, (range_cnt - jj - 1) * sizeof (*ranges));
+                if (ii > jj)
+                {
+                    ii--;
+                }
+                jj = -1;
+            }
+            range_cnt--;
         }
     }
 
+    for (ii = 0; ii < range_cnt; ii++)
+    {
+        printf ("%"SCNu64"-%"SCNu64"\n", ranges[ii].x, ranges[ii].y);
+        sum += ranges[ii].y - ranges[ii].x + 1;
+    }
 
     printf ("sum: %d\n", sum);
-
 
     free (ranges);
     return 0;
